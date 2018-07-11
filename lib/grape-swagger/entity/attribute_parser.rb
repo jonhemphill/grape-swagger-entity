@@ -13,7 +13,7 @@ module GrapeSwagger
 
         if entity_model
           name = endpoint.nil? ? entity_model.to_s.demodulize : endpoint.send(:expose_params_from_model, entity_model)
-          return entity_model_type(name, entity_options)
+          return entity_model_type(name, documentation)
         else
           param = data_type_from(entity_options)
           return param unless documentation
@@ -25,12 +25,20 @@ module GrapeSwagger
             param[:enum] = values if values.is_a?(Array)
           end
 
-          param = { type: :array, items: param } if documentation[:is_array]
+          param = array_attribute(param, documentation) if documentation[:is_array]
+
           param
         end
       end
 
       private
+
+      def array_attribute(items_attribute, documentation)
+        attribute = { type: :array, items: items_attribute }
+        attribute[:minItems] = documentation[:min_items] if documentation[:min_items]
+        # TODO: Add other array-only properties here!!!
+        attribute
+      end
 
       def model_from(entity_options)
         model = entity_options[:using] if entity_options[:using].present?
@@ -77,19 +85,10 @@ module GrapeSwagger
         type
       end
 
-      def entity_model_type(name, entity_options)
-        if entity_options[:documentation] && entity_options[:documentation][:is_array]
-          {
-            'type' => 'array',
-            'items' => {
-              '$ref' => "#/definitions/#{name}"
-            }
-          }
-        else
-          {
-            '$ref' => "#/definitions/#{name}"
-          }
-        end
+      def entity_model_type(name, documentation)
+        param = { '$ref' => "#/definitions/#{name}" }
+        param = array_attribute(param, documentation) if documentation && documentation[:is_array]
+        param
       end
 
       def add_attribute_example(attribute, example)
